@@ -168,6 +168,78 @@ func (s *serverService) SSH(alias string) error {
 	return nil
 }
 
+func (s *serverService) CopySSHKey(alias string) error {
+	s.logger.Infow("ssh-copy-id start", "alias", alias)
+
+	// Ensure ssh-copy-id exists on PATH
+	if _, err := exec.LookPath("ssh-copy-id"); err != nil {
+		s.logger.Errorw("ssh-copy-id missing", "error", err)
+		return fmt.Errorf("ssh-copy-id not found; install OpenSSH (e.g., brew install openssh)")
+	}
+
+	// Resolve host, port, and user via `ssh -G <alias>`
+	host := ""
+	port := 0
+	user := ""
+	cmd := exec.Command("ssh", "-G", alias)
+	out, err := cmd.Output()
+	if err == nil {
+		scanner := bufio.NewScanner(strings.NewReader(string(out)))
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.HasPrefix(line, "hostname ") {
+				parts := strings.Fields(line)
+				if len(parts) >= 2 {
+					host = parts[1]
+				}
+			}
+			if strings.HasPrefix(line, "port ") {
+				parts := strings.Fields(line)
+				if len(parts) >= 2 {
+					if p, err := strconv.Atoi(parts[1]); err == nil {
+						port = p
+					}
+				}
+			}
+			if strings.HasPrefix(line, "user ") {
+				parts := strings.Fields(line)
+				if len(parts) >= 2 {
+					user = parts[1]
+				}
+			}
+		}
+	}
+	if strings.TrimSpace(host) == "" {
+		host = alias
+	}
+	if port == 0 {
+		port = 22
+	}
+
+	target := host
+	if strings.TrimSpace(user) != "" {
+		target = user + "@" + host
+	}
+
+	args := []string{}
+	if port != 22 {
+		args = append(args, "-p", strconv.Itoa(port))
+	}
+	args = append(args, target)
+
+	copyCmd := exec.Command("ssh-copy-id", args...)
+	copyCmd.Stdin = os.Stdin
+	copyCmd.Stdout = os.Stdout
+	copyCmd.Stderr = os.Stderr
+	if err := copyCmd.Run(); err != nil {
+		s.logger.Errorw("ssh-copy-id failed", "alias", alias, "error", err)
+		return err
+	}
+
+	s.logger.Infow("ssh-copy-id end", "alias", alias)
+	return nil
+}
+
 // Ping checks if the server is reachable on its SSH port.
 func (s *serverService) Ping(server domain.Server) (bool, time.Duration, error) {
 	start := time.Now()
