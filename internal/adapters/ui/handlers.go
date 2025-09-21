@@ -176,6 +176,19 @@ func (t *tui) handleSearchToggle() {
 	t.showSearchBar()
 }
 
+func (t *tui) handleSearchEnter(query string) {
+	// Perform immediate search (same as handleSearchInput)
+	filtered, _ := t.serverService.ListServers(query)
+	sortServersForUI(filtered, t.sortMode)
+	t.serverList.UpdateServers(filtered)
+	if len(filtered) == 0 {
+		t.details.ShowEmpty()
+	}
+
+	// Hide search bar and return focus to server list
+	t.hideSearchBar()
+}
+
 func (t *tui) handleServerConnect() {
 	if server, ok := t.serverList.GetSelectedServer(); ok {
 
