@@ -25,6 +25,7 @@ type SearchBar struct {
 	*tview.InputField
 	onSearch   func(string)
 	onEscape   func()
+	onEnter    func(string)
 	searchTimer *time.Timer
 	searchDelay time.Duration
 }
@@ -68,7 +69,12 @@ func (s *SearchBar) build() {
 			s.searchTimer.Stop()
 			s.searchTimer = nil
 		}
-		if key == tcell.KeyEsc || key == tcell.KeyEnter {
+		if key == tcell.KeyEnter {
+			if s.onEnter != nil {
+				text := s.InputField.GetText()
+				s.onEnter(text)
+			}
+		} else if key == tcell.KeyEsc {
 			if s.onEscape != nil {
 				s.onEscape()
 			}
@@ -83,6 +89,11 @@ func (s *SearchBar) OnSearch(fn func(string)) *SearchBar {
 
 func (s *SearchBar) OnEscape(fn func()) *SearchBar {
 	s.onEscape = fn
+	return s
+}
+
+func (s *SearchBar) OnEnter(fn func(string)) *SearchBar {
+	s.onEnter = fn
 	return s
 }
 
